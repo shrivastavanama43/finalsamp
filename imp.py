@@ -1,10 +1,11 @@
 # app.py
 """
-Hypertension Detection Demo App — UI-enhanced version
-- Keeps original functionality (DB, model, risk scoring, reminders, prescriptions)
-- Removes sidebar; uses Continue/Back buttons for navigation
-- Adds CSS animations, SVG visuals, dark theme
-- Prescription page made more detailed
+Hypertension Detection Demo App — final UI + persistent login
+- All original logic preserved (DB, model, scoring, reminders, prescriptions)
+- No sidebar; navigation via Continue / Back buttons
+- CSS animations + inline SVG visuals
+- Persistent login: saves last login in last_login.json
+- All forms include a submit button; nav buttons outside forms
 """
 
 import json
@@ -13,7 +14,7 @@ import sqlite3
 import threading
 import time
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional
 
 import joblib
 import numpy as np
@@ -26,7 +27,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-# Optional Twilio import (not required)
+# Optional Twilio import
 try:
     from twilio.rest import Client as TwilioClient
 
@@ -37,7 +38,8 @@ except Exception:
 # ---------- Config ----------
 MODEL_PATH = "hypertension_demo_model.pkl"
 DB_PATH = "users_demo.db"
-DEBUG_ST = False  # toggle for debug info
+LAST_LOGIN_PATH = "last_login.json"
+DEBUG_ST = False
 
 st.set_page_config(page_title="Hypertension Detection — Demo", layout="centered", page_icon="💓")
 
@@ -114,7 +116,7 @@ def save_user_profile(profile: Dict):
     DB_CONN.commit()
 
 
-def load_user(email: str):
+def load_user(email: str) -> Optional[Dict]:
     if not email:
         return None
     c = DB_CONN.cursor()
@@ -144,8 +146,35 @@ def load_user(email: str):
     return out
 
 
+def save_last_login(email: str):
+    try:
+        with open(LAST_LOGIN_PATH, "w") as f:
+            json.dump({"email": email}, f)
+    except Exception:
+        pass
+
+
+def load_last_login() -> Optional[str]:
+    try:
+        if os.path.exists(LAST_LOGIN_PATH):
+            with open(LAST_LOGIN_PATH, "r") as f:
+                d = json.load(f)
+                return d.get("email")
+    except Exception:
+        pass
+    return None
+
+
+def clear_last_login():
+    try:
+        if os.path.exists(LAST_LOGIN_PATH):
+            os.remove(LAST_LOGIN_PATH)
+    except Exception:
+        pass
+
+
 # -------------------------
-# BMI and features
+# BMI and model utilities
 # -------------------------
 def compute_bmi(weight_kg: float, height_cm: float):
     try:
@@ -169,9 +198,6 @@ def create_feature_vector(age, gender, bmi, qanswers):
     return [age, gender_num, bmi, smoking, alcohol, family_history, sedentary, headache, stress]
 
 
-# -------------------------
-# Rule-based risk
-# -------------------------
 def rule_based_risk(age, bmi, qanswers):
     score = 0
     if age >= 60:
@@ -199,9 +225,6 @@ def rule_based_risk(age, bmi, qanswers):
     return round(prob, 2), score
 
 
-# -------------------------
-# Demo ML model
-# -------------------------
 def train_demo_model(path=MODEL_PATH):
     n = 3000
     rng = np.random.RandomState(42)
@@ -260,7 +283,7 @@ def model_predict_risk(age, gender, bmi, qanswers):
 
 
 # -------------------------
-# Questions
+# Questions & reminders
 # -------------------------
 QUESTIONS = [
     {"id": "smoking", "text": "Do you smoke?"},
@@ -273,10 +296,6 @@ QUESTIONS = [
     {"id": "sleep", "text": "Do you have trouble sleeping? (insomnia, poor sleep)"},
 ]
 
-
-# -------------------------
-# Reminders (demo)
-# -------------------------
 REMINDERS_KEY = "reminders"
 
 
@@ -296,9 +315,6 @@ def schedule_in_app_reminders():
     thread.start()
 
 
-# -------------------------
-# Twilio helper (optional)
-# -------------------------
 def send_sms_via_twilio(to_phone, message, account_sid, auth_token, from_phone):
     if not TWILIO_AVAILABLE:
         raise RuntimeError("Twilio package not available. Install `twilio`.")
@@ -308,7 +324,7 @@ def send_sms_via_twilio(to_phone, message, account_sid, auth_token, from_phone):
 
 
 # -------------------------
-# UI helpers: CSS + visuals
+# UI: CSS + visuals
 # -------------------------
 def inject_global_css():
     css = r"""
@@ -406,7 +422,7 @@ def svg_bp_visual():
 
 
 # -------------------------
-# Pages & UI (no sidebar)
+# Pages (forms with submit; nav buttons outside forms)
 # -------------------------
 def login_page():
     st.markdown('<div class="card input-anim">', unsafe_allow_html=True)
@@ -453,6 +469,8 @@ def login_page():
             "data": {},
         }
         save_user_profile(profile)
+        # persist last login
+        save_last_login(st.session_state["email"])
 
         st.session_state["page"] = "Intro"
         st.stop()
@@ -466,6 +484,7 @@ def intro_and_health_input():
 
     st.markdown('<div class="bubbles"><div class="bubble"></div><div class="bubble b2"></div></div>', unsafe_allow_html=True)
 
+    # FORM: inputs + form_submit_button only
     with st.form("health_form_ui"):
         st.markdown('<div class="card input-anim">', unsafe_allow_html=True)
         st.markdown("### Quick health questions")
@@ -485,13 +504,14 @@ def intro_and_health_input():
         height = st.number_input("Height (cm)", min_value=80.0, max_value=250.0, value=height_default, format="%.1f", key="ui_height")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        cols = st.columns([1, 1, 1])
-        with cols[0]:
-            if st.button("Back", key="intro_back"):
-                st.session_state["page"] = "Home"
-                st.stop()
-        with cols[2]:
-            submitted = st.form_submit_button("Save & Continue", use_container_width=True)
+        submitted = st.form_submit_button("Save & Continue", use_container_width=True)
+
+    # Back button outside the form (prevents missing submit button error)
+    nav_cols = st.columns([1, 1, 1])
+    with nav_cols[0]:
+        if st.button("Back", key="intro_back_outside"):
+            st.session_state["page"] = "Home"
+            st.stop()
 
     if submitted:
         for k, v in answers.items():
@@ -571,6 +591,7 @@ def risk_and_prescription():
         st.markdown(f"### Combined estimate: **{int(combined_prob*100)}%**")
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # Prescription details
     st.markdown('<div class="card input-anim">', unsafe_allow_html=True)
     st.markdown("## Prescription — Detailed")
     default_rx = ""
@@ -771,75 +792,4 @@ def reminders_page():
         sid = st.text_input("Twilio Account SID", key="tw_sid_ui")
         token = st.text_input("Twilio Auth Token", type="password", key="tw_token_ui")
         from_phone = st.text_input("Twilio From Phone (E.164)", key="tw_from_ui")
-        to_phone = st.text_input("Recipient Phone (E.164)", value=st.session_state.get("phone", ""), key="tw_to_ui")
-        if st.button("Send test SMS now", key="tw_test"):
-            if not TWILIO_AVAILABLE:
-                st.error("Twilio SDK not installed. Install `twilio` package.")
-            else:
-                try:
-                    for r in reminders:
-                        sid_resp = send_sms_via_twilio(to_phone, f"Reminder: {r['message']} at {r['time']}", sid, token, from_phone)
-                    st.success("Test messages sent.")
-                except Exception as e:
-                    st.error(f"Failed to send SMS: {e}")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    cols = st.columns([1, 1])
-    with cols[0]:
-        if st.button("Back to Profile", key="rem_back"):
-            st.session_state["page"] = "Profile"
-            st.stop()
-    with cols[1]:
-        if st.button("Start Over (Logout)", key="rem_reset"):
-            for k in list(st.session_state.keys()):
-                st.session_state.pop(k)
-            st.session_state["page"] = "Home"
-            st.stop()
-
-
-# -------------------------
-# Main page (no sidebar)
-# -------------------------
-def main():
-    inject_global_css = None  # placeholder for local name check below
-
-# inject css, render header, handle routing
-def _main():
-    # inject css and visuals
-    inject_global_css()
-    render_steps_header()
-
-    if "page" not in st.session_state:
-        st.session_state["page"] = "Home"
-
-    if DEBUG_ST:
-        st.write("DEBUG:", dict(st.session_state))
-
-    page = st.session_state.get("page", "Home")
-    if page == "Home":
-        login_page()
-    elif page == "Intro":
-        if not st.session_state.get("email"):
-            st.info("Please login on the Home page first.")
-        else:
-            intro_and_health_input()
-    elif page == "Risk":
-        if not st.session_state.get("email"):
-            st.info("Please login on the Home page first.")
-        else:
-            risk_and_prescription()
-    elif page == "Profile":
-        if not st.session_state.get("email"):
-            st.info("Please login on the Home page first.")
-        else:
-            user_profile_page()
-    elif page == "Reminders":
-        if not st.session_state.get("email"):
-            st.info("Please login on the Home page first.")
-        else:
-            reminders_page()
-
-
-# call main
-if __name__ == "__main__":
-    _main()
+        to_phone = st.text_input("Recipient Phone (E.164)", value=st.session_state.get("phone", ""), key="_
