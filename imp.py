@@ -792,4 +792,4 @@ def reminders_page():
         sid = st.text_input("Twilio Account SID", key="tw_sid_ui")
         token = st.text_input("Twilio Auth Token", type="password", key="tw_token_ui")
         from_phone = st.text_input("Twilio From Phone (E.164)", key="tw_from_ui")
-        to_phone = st.text_input("Recipient Phone (E.164)", value=st.session_state.get("phone", ""), key="_")
+        to_phone = st.text_input("Recipient Phone (E.164)", value=st.session_state.get("phone", ""), key="_"
