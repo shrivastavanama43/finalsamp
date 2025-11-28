@@ -1,10 +1,9 @@
 # app.py
 """
 Hypertension Detection Demo App — UI-enhanced version
-- All original functions preserved (DB, model, risk scoring, reminders, prescriptions)
-- Sidebar removed; navigation uses Continue / Back buttons
-- CSS animations and inline SVG visuals added
-- Dark theme (black background) with colorful accents
+- Keeps original functionality (DB, model, risk scoring, reminders, prescriptions)
+- Removes sidebar; uses Continue/Back buttons for navigation
+- Adds CSS animations, SVG visuals, dark theme
 - Prescription page made more detailed
 """
 
@@ -38,9 +37,8 @@ except Exception:
 # ---------- Config ----------
 MODEL_PATH = "hypertension_demo_model.pkl"
 DB_PATH = "users_demo.db"
-DEBUG_ST = False  # toggle to show debug info about streamlit object
+DEBUG_ST = False  # toggle for debug info
 
-# Streamlit page config
 st.set_page_config(page_title="Hypertension Detection — Demo", layout="centered", page_icon="💓")
 
 # -------------------------
@@ -313,7 +311,6 @@ def send_sms_via_twilio(to_phone, message, account_sid, auth_token, from_phone):
 # UI helpers: CSS + visuals
 # -------------------------
 def inject_global_css():
-    """Inject CSS for dark theme, cards, animations."""
     css = r"""
     <style>
     :root{
@@ -325,15 +322,12 @@ def inject_global_css():
         --accent3:#7bff8c;
         --glass: rgba(255,255,255,0.04);
     }
-    /* Page background */
     .stApp {
       background: radial-gradient(ellipse at top left, rgba(0,217,255,0.03), transparent 20%),
                   radial-gradient(ellipse at bottom right, rgba(255,110,199,0.03), transparent 20%),
                   var(--bg) !important;
       color: #e6eef6;
     }
-
-    /* Card */
     .card {
       background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
       border-radius: 14px;
@@ -344,84 +338,34 @@ def inject_global_css():
       margin-bottom: 18px;
     }
     .card:hover { transform: translateY(-6px); box-shadow: 0 18px 40px rgba(0,0,0,0.7); }
-
-    /* Animated input container */
-    .input-anim {
-      animation: floatIn 420ms ease forwards;
-      opacity: 0;
-      transform: translateY(8px) scale(0.995);
-    }
-    @keyframes floatIn {
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-
-    /* Button style */
-    .btn-primary {
-      background: linear-gradient(90deg,var(--accent1), var(--accent2));
-      color: #04111a;
-      font-weight: 700;
-      padding: 10px 18px;
-      border-radius: 10px;
-      border: none;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.6);
-      cursor: pointer;
-      transition: transform 160ms, box-shadow 160ms;
-    }
-    .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 20px 36px rgba(0,0,0,0.7); }
-
-    .btn-ghost {
-      background: transparent;
-      color: var(--accent1);
-      border: 1px solid rgba(255,255,255,0.06);
-      padding: 8px 14px;
-      border-radius: 8px;
-    }
-
-    /* Step header */
-    .steps {
-      display:flex; gap:14px; align-items:center; margin-bottom:12px;
-    }
-    .step {
-      padding:8px 12px; border-radius:999px; font-weight:700; font-size:14px;
-      color: #071322; background: linear-gradient(90deg,var(--accent2),var(--accent1));
-      box-shadow: 0 6px 18px rgba(0,0,0,0.6);
-    }
+    .input-anim { animation: floatIn 420ms ease forwards; opacity: 0; transform: translateY(8px) scale(0.995); }
+    @keyframes floatIn { to { opacity: 1; transform: translateY(0) scale(1); } }
+    .btn-primary { background: linear-gradient(90deg,var(--accent1), var(--accent2)); color: #04111a; font-weight:700; padding:10px 18px; border-radius:10px; border:none; box-shadow:0 6px 18px rgba(0,0,0,0.6); cursor:pointer; transition: transform 160ms, box-shadow 160ms; }
+    .btn-primary:hover { transform: translateY(-3px); box-shadow:0 20px 36px rgba(0,0,0,0.7); }
+    .btn-ghost { background: transparent; color: var(--accent1); border:1px solid rgba(255,255,255,0.06); padding:8px 14px; border-radius:8px; }
+    .steps { display:flex; gap:14px; align-items:center; margin-bottom:12px; }
+    .step { padding:8px 12px; border-radius:999px; font-weight:700; font-size:14px; color:#071322; background: linear-gradient(90deg,var(--accent2),var(--accent1)); box-shadow:0 6px 18px rgba(0,0,0,0.6); }
     .step-inactive { padding:8px 12px; border-radius:999px; color:var(--muted); background:transparent; border:1px solid rgba(255,255,255,0.03); }
-
-    /* small animated visuals container */
-    .visual {
-      width:100%; display:flex; justify-content:center; margin-bottom: 8px;
-    }
-
-    /* floating bubbles */
+    .visual { width:100%; display:flex; justify-content:center; margin-bottom: 8px; }
     .bubbles { position: absolute; left:0; right:0; top:0; bottom:0; pointer-events:none; opacity:0.08; }
     .bubble { width:100px; height:100px; border-radius:50%; background: radial-gradient(circle at 30% 30%, rgba(255,110,199,0.7), rgba(0,217,255,0.2)); filter: blur(18px); animation: floaty 8s linear infinite; }
     .bubble.b2 { left:70%; top:10%; animation-duration:12s; background: radial-gradient(circle at 30% 30%, rgba(123,255,140,0.6), rgba(0,217,255,0.12)); }
     @keyframes floaty { 0% { transform: translateY(0) } 50% { transform: translateY(-30px) scale(1.02) } 100% { transform: translateY(0) } }
-
-    /* small svg stroke animation */
     .draw path { stroke-dasharray: 400; stroke-dashoffset: 400; animation: dash 1.6s ease forwards; }
     @keyframes dash { to { stroke-dashoffset: 0; } }
-
-    /* prescription card details */
     .rx-grid { display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:start; }
     .rx-list { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:12px; border-radius:8px; }
-    /* small responsive tweak */
     @media (max-width: 720px) { .rx-grid { grid-template-columns: 1fr; } }
-
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
 
 
 def render_steps_header():
-    """Top step indicator (no sidebar)."""
     page = st.session_state.get("page", "Home")
-    # inline HTML for steps with classes
     def mk_step(name, active):
         cls = "step" if active else "step-inactive"
         return f'<div class="{cls}">{name}</div>'
-
     steps_html = f"""
     <div class="steps">
       {mk_step("1. Login", page=="Home")}
@@ -435,7 +379,6 @@ def render_steps_header():
 
 
 def svg_bp_visual():
-    """Inline animated SVG showing a simple blood-pressure heart + cuff visual."""
     svg = r'''
     <div class="visual card input-anim" style="padding:10px; margin-bottom:6px; display:flex; justify-content:center;">
       <svg width="220" height="120" viewBox="0 0 220 120" xmlns="http://www.w3.org/2000/svg" class="draw">
@@ -446,19 +389,15 @@ def svg_bp_visual():
          </linearGradient>
         </defs>
         <g transform="translate(10,10)">
-          <!-- cuff -->
           <rect x="120" y="15" rx="8" ry="8" width="70" height="80" fill="#071722" stroke="#00d9ff" stroke-opacity="0.7" />
           <rect x="130" y="25" rx="6" ry="6" width="50" height="60" fill="#081820" stroke="#ff6ec7" stroke-opacity="0.6" />
-          <!-- tube -->
           <path d="M110 60 C100 55, 85 55, 70 60" stroke="url(#g1)" stroke-width="4" fill="none" />
-          <!-- heart -->
           <path d="M60 40
                    C60 25, 35 25, 35 40
                    C35 55, 60 70, 60 70
                    C60 70, 85 55, 85 40
                    C85 25, 60 25, 60 40 Z"
                 fill="#ff6ec7" stroke="#fff5" stroke-width="0.6" />
-          <circle cx="60" cy="40" r="1.2" fill="#fff" />
         </g>
       </svg>
     </div>
@@ -474,10 +413,8 @@ def login_page():
     st.subheader("Welcome — Login / Register")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # show animated visual
     svg_bp_visual()
 
-    # Form card
     st.markdown('<div class="card input-anim">', unsafe_allow_html=True)
     with st.form("login_form_ui"):
         email = st.text_input("Email", value=st.session_state.get("email", ""), key="login_email_ui")
@@ -485,7 +422,6 @@ def login_page():
         name = st.text_input("Full name", value=st.session_state.get("name", ""), key="login_name_ui")
         age = st.number_input("Age", min_value=10, max_value=120, value=int(st.session_state.get("age", 25)), key="login_age_ui")
         gender = st.selectbox("Gender", options=["Male", "Female", "Other"], index=0, key="login_gender_ui")
-        # buttons styled via markdown after submit
         submitted = st.form_submit_button("Continue", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -505,7 +441,6 @@ def login_page():
                 if k in ["weight", "height", "bmi", "age", "phone", "name", "gender"]:
                     st.session_state[k] = v
 
-        # Save basic profile and go to next page
         profile = {
             "email": st.session_state["email"],
             "phone": st.session_state.get("phone"),
@@ -529,11 +464,9 @@ def intro_and_health_input():
     st.write("Choose: No / Sometimes / Yes. Your answers are saved locally in this demo.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # small animated decorative bubbles behind cards (light)
     st.markdown('<div class="bubbles"><div class="bubble"></div><div class="bubble b2"></div></div>', unsafe_allow_html=True)
 
     with st.form("health_form_ui"):
-        # questions are rendered in a colorful card
         st.markdown('<div class="card input-anim">', unsafe_allow_html=True)
         st.markdown("### Quick health questions")
         answers = {}
@@ -552,7 +485,6 @@ def intro_and_health_input():
         height = st.number_input("Height (cm)", min_value=80.0, max_value=250.0, value=height_default, format="%.1f", key="ui_height")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # bottom controls: Back and Continue
         cols = st.columns([1, 1, 1])
         with cols[0]:
             if st.button("Back", key="intro_back"):
@@ -561,7 +493,6 @@ def intro_and_health_input():
         with cols[2]:
             submitted = st.form_submit_button("Save & Continue", use_container_width=True)
 
-    # after leaving the with-block the submitted var exists
     if submitted:
         for k, v in answers.items():
             st.session_state["q_" + k] = v
@@ -598,16 +529,13 @@ def risk_and_prescription():
     st.subheader("Risk Assessment & Prescription")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # left: animated visual; right: risk summary card
     cols = st.columns([1, 2])
     with cols[0]:
-        # small animated SVG visual (pulse)
         st.markdown(
             """
             <div class="card input-anim" style="display:flex;justify-content:center;align-items:center;">
               <svg width="140" height="140" viewBox="0 0 140 140">
                 <circle cx="70" cy="70" r="44" fill="none" stroke="rgba(0,217,255,0.06)" stroke-width="10"/>
-                <circle cx="70" cy="70" r="44" fill="none" stroke="url(#g)" stroke-width="6" style="filter: blur(6px); opacity:0.8"/>
                 <defs><linearGradient id="g"><stop offset="0" stop-color="#00d9ff"/><stop offset="1" stop-color="#ff6ec7"/></linearGradient></defs>
                 <g transform="translate(35,35)">
                   <path d="M20 18 C20 6, 2 6, 2 18 C2 30, 20 36, 20 48 C20 36, 38 30, 38 18 C38 6, 20 6, 20 18 Z" fill="#ff6ec7" transform-origin="19 28">
@@ -643,7 +571,6 @@ def risk_and_prescription():
         st.markdown(f"### Combined estimate: **{int(combined_prob*100)}%**")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Prescription detailed card and controls
     st.markdown('<div class="card input-anim">', unsafe_allow_html=True)
     st.markdown("## Prescription — Detailed")
     default_rx = ""
@@ -654,13 +581,11 @@ def risk_and_prescription():
     else:
         default_rx = "Low risk — maintain healthy lifestyle: balanced diet, regular activity, routine BP checks."
 
-    # more detailed prescription inputs
     med_name = st.text_input("Medication (if prescribed)", value="", key="med_name")
     med_dose = st.text_input("Dose & timing (e.g., 5 mg — morning)", value="", key="med_dose")
     rx = st.text_area("Prescription / Advice (editable)", value=default_rx, height=140, key="rx_text")
     followup = st.selectbox("Suggested follow-up", options=["2 weeks", "1 month", "3 months", "As needed"], index=1, key="followup_select")
 
-    # medication schedule (table-like) — user can add rows
     st.markdown("### Medication schedule")
     if "med_schedule" not in st.session_state:
         st.session_state["med_schedule"] = []
@@ -675,13 +600,9 @@ def risk_and_prescription():
                 st.session_state["med_schedule"].append({"name": new_med, "time": new_time.strftime("%H:%M")})
                 st.success("Added to schedule")
 
-    # display schedule
-    if st.session_state["med_schedule"]:
-        rows = st.session_state["med_schedule"]
-        df = pd.DataFrame(rows)
-        st.table(df)
+    if st.session_state.get("med_schedule"):
+        st.table(pd.DataFrame(st.session_state["med_schedule"]))
 
-    # save prescription button
     cols_btn = st.columns([1, 1, 1])
     with cols_btn[0]:
         if st.button("Back", key="risk_back"):
@@ -750,7 +671,6 @@ def user_profile_page():
         st.info("No profile found. Please login / register.")
         return
 
-    # top visual and summary columns
     cols = st.columns([1, 2])
     with cols[0]:
         st.markdown(
@@ -798,7 +718,6 @@ def user_profile_page():
         st.write("No saved prescription yet.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Diet & lifestyle short plan
     st.markdown('<div class="card input-anim">', unsafe_allow_html=True)
     st.markdown("### Diet & Lifestyle (short & precise)")
     plan = generate_short_plan(user, answers)
@@ -806,7 +725,6 @@ def user_profile_page():
         st.write(f"- {item}")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # navigation controls
     cols = st.columns([1, 1])
     with cols[0]:
         if st.button("Back to Risk", key="profile_back"):
@@ -873,7 +791,6 @@ def reminders_page():
             st.stop()
     with cols[1]:
         if st.button("Start Over (Logout)", key="rem_reset"):
-            # clear session
             for k in list(st.session_state.keys()):
                 st.session_state.pop(k)
             st.session_state["page"] = "Home"
@@ -881,24 +798,23 @@ def reminders_page():
 
 
 # -------------------------
-# Main page (no sidebar) — inject CSS + render pages with Continue/Back
+# Main page (no sidebar)
 # -------------------------
 def main():
-    # inject CSS and theme
-    inject_global_css()
+    inject_global_css = None  # placeholder for local name check below
 
-    # ensure page stored
+# inject css, render header, handle routing
+def _main():
+    # inject css and visuals
+    inject_global_css()
+    render_steps_header()
+
     if "page" not in st.session_state:
         st.session_state["page"] = "Home"
 
-    # show a compact top header with steps
-    render_steps_header()
-
-    # minimal debug info if asked
     if DEBUG_ST:
-        st.write("DEBUG session:", dict(st.session_state))
+        st.write("DEBUG:", dict(st.session_state))
 
-    # render pages
     page = st.session_state.get("page", "Home")
     if page == "Home":
         login_page()
@@ -924,5 +840,6 @@ def main():
             reminders_page()
 
 
+# call main
 if __name__ == "__main__":
-    main()
+    _main()
