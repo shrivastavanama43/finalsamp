@@ -760,7 +760,7 @@ def user_profile_page():
 def reminders_page():
     st.markdown('<div class="card input-anim">', unsafe_allow_html=True)
     st.subheader("Daily Reminders & Medication Schedule")
-    st.write("In-app reminders are shown here. Configure Twilio to send SMS/call reminders (optional).")
+    st.write("This demo can show in-app reminders. For real SMS or call reminders, configure Twilio credentials below.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     reminders = st.session_state.get(
@@ -776,6 +776,7 @@ def reminders_page():
         st.write(f"- **{r['time']}** — {r['message']}")
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # Add reminder form (submit button inside form)
     with st.form("add_reminder_ui"):
         t = st.time_input("Reminder time", value=datetime.now().replace(hour=9, minute=0).time(), key="rem_t")
         msg = st.text_input("Message", value="Take medication on time", key="rem_msg")
@@ -786,10 +787,37 @@ def reminders_page():
         st.success("Reminder added (in-app)")
 
     st.markdown('<div class="card input-anim">', unsafe_allow_html=True)
-    st.markdown("### Twilio (optional)")
-    use_twilio = st.checkbox("Enable Twilio reminders (requires credentials)", value=False, key="use_tw_ui")
+    st.markdown("### Twilio (optional) — send SMS / Call reminders")
+    st.write("If you'd like the app to send SMS or make calls, provide Twilio credentials. This is optional and costs SMS/call credits.")
+
+    use_twilio = st.checkbox("Enable Twilio reminders (requires credentials)", value=False, key="use_twilio")
     if use_twilio:
-        sid = st.text_input("Twilio Account SID", key="tw_sid_ui")
-        token = st.text_input("Twilio Auth Token", type="password", key="tw_token_ui")
-        from_phone = st.text_input("Twilio From Phone (E.164)", key="tw_from_ui")
-        to_phone = st.text_input("Recipient Phone (E.164)", value=st.session_state.get("phone", ""), key="_"
+        sid = st.text_input("Twilio Account SID", key="tw_sid")
+        token = st.text_input("Twilio Auth Token", type="password", key="tw_token")
+        from_phone = st.text_input("Twilio From Phone (E.164)", key="tw_from")
+        # <- corrected line below; ensure the string is closed and key is valid
+        to_phone = st.text_input("Recipient Phone (E.164)", value=st.session_state.get("phone", ""), key="tw_to")
+        if st.button("Send test SMS now", key="send_test_sms"):
+            if not TWILIO_AVAILABLE:
+                st.error("Twilio SDK not installed. Install the `twilio` package.")
+            else:
+                try:
+                    for r in reminders:
+                        sid_resp = send_sms_via_twilio(to_phone, f"Reminder: {r['message']} at {r['time']}", sid, token, from_phone)
+                    st.success("Test messages sent.")
+                except Exception as e:
+                    st.error(f"Failed to send SMS: {e}")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    cols = st.columns([1, 1])
+    with cols[0]:
+        if st.button("Back to Profile", key="rem_back"):
+            st.session_state["page"] = "Profile"
+            st.stop()
+    with cols[1]:
+        if st.button("Start Over (Logout)", key="rem_reset"):
+            # clear session (but keep last_login if user didn't choose to forget)
+            for k in list(st.session_state.keys()):
+                st.session_state.pop(k)
+            st.session_state["page"] = "Home"
+            st.stop()
