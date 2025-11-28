@@ -617,4 +617,30 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    def main():
+    st.title("Hypertension Detection — Demo App")
+
+    # Initialise page if not set
+    if "page" not in st.session_state:
+        st.session_state.page = "Home"
+
+    # Sidebar navigation (manual override allowed)
+    menu = ["Home", "Intro", "Risk", "Profile", "Reminders"]
+    choice = st.sidebar.radio("Navigate", menu, index=menu.index(st.session_state.page))
+
+    # Sync sidebar choice with session state
+    if choice != st.session_state.page:
+        st.session_state.page = choice
+
+    # Render active page
+    if st.session_state.page == "Home":
+        login_page()
+    elif st.session_state.page == "Intro":
+        intro_and_health_input()
+    elif st.session_state.page == "Risk":
+        risk_and_prescription()
+    elif st.session_state.page == "Profile":
+        user_profile_page()
+    elif st.session_state.page == "Reminders":
+        reminders_page()
+
