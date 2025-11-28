@@ -618,7 +618,7 @@ def main():
 
 if __name__ == "__main__":
     def main():
-st.title("Hypertension Detection — Demo App")
+        st.title("Hypertension Detection — Demo App")
 
     # Initialise page if not set
     if "page" not in st.session_state:
