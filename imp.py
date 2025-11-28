@@ -1,13 +1,13 @@
 # app.py
 """
-Hypertension Detection Demo App (corrected)
-- Avoids accidental shadowing of `st`
-- Uses safe experimental_rerun via fresh import
-- Uses session_state flags instead of brittle reruns
+Hypertension Detection Demo App (patched)
+- Robust navigation via st.session_state['page']
+- All forms have submit buttons
+- Safe defaults for numeric inputs
+- Unique widget keys to avoid collisions
 - Demo-only: not medical advice
 """
 
-import importlib
 import json
 import os
 import sqlite3
@@ -30,6 +30,7 @@ from sklearn.preprocessing import StandardScaler
 # Optional Twilio import (not required)
 try:
     from twilio.rest import Client as TwilioClient
+
     TWILIO_AVAILABLE = True
 except Exception:
     TWILIO_AVAILABLE = False
@@ -37,7 +38,7 @@ except Exception:
 # ---------- Config ----------
 MODEL_PATH = "hypertension_demo_model.pkl"
 DB_PATH = "users_demo.db"
-DEBUG_ST = False  # Set True to show debug about streamlit object on the page
+DEBUG_ST = False  # toggle for debug info about streamlit object
 
 st.set_page_config(page_title="Hypertension Detection Demo", layout="centered")
 
@@ -148,11 +149,14 @@ def load_user(email: str):
 # BMI and features
 # -------------------------
 def compute_bmi(weight_kg: float, height_cm: float):
-    h_m = float(height_cm) / 100.0
-    if h_m <= 0:
+    try:
+        h_m = float(height_cm) / 100.0
+        if h_m <= 0:
+            return None
+        bmi = float(weight_kg) / (h_m * h_m)
+        return round(bmi, 2)
+    except Exception:
         return None
-    bmi = float(weight_kg) / (h_m * h_m)
-    return round(bmi, 2)
 
 
 def create_feature_vector(age, gender, bmi, qanswers):
@@ -305,23 +309,8 @@ def send_sms_via_twilio(to_phone, message, account_sid, auth_token, from_phone):
 
 
 # -------------------------
-# Pages (safe rerun & session flags)
+# Pages & UI
 # -------------------------
-def safe_rerun_or_notice():
-    """
-    Attempt to call streamlit.experimental_rerun using a fresh import.
-    If that fails, show a notice and rely on session_state flags.
-    """
-    try:
-        _st = importlib.import_module("streamlit")
-        if hasattr(_st, "experimental_rerun"):
-            _st.experimental_rerun()
-        else:
-            st.info("Saved. Please refresh the page or navigate to continue.")
-    except Exception:
-        st.info("Saved. Please refresh the page or navigate to continue.")
-
-
 def login_page():
     st.header("Welcome — Login / Register")
 
@@ -331,14 +320,15 @@ def login_page():
         st.write("streamlit version:", getattr(st, "__version__", "unknown"))
 
     with st.form("login_form"):
-        email = st.text_input("Email", value=st.session_state.get("email", ""))
-        phone = st.text_input("Phone (optional)", value=st.session_state.get("phone", ""))
-        name = st.text_input("Full name", value=st.session_state.get("name", ""))
-        age = st.number_input("Age", min_value=10, max_value=120, value=int(st.session_state.get("age", 25)))
-        gender = st.selectbox("Gender", options=["Male", "Female", "Other"], index=0)
+        email = st.text_input("Email", value=st.session_state.get("email", ""), key="login_email")
+        phone = st.text_input("Phone (optional)", value=st.session_state.get("phone", ""), key="login_phone")
+        name = st.text_input("Full name", value=st.session_state.get("name", ""), key="login_name")
+        age = st.number_input("Age", min_value=10, max_value=120, value=int(st.session_state.get("age", 25)), key="login_age")
+        gender = st.selectbox("Gender", options=["Male", "Female", "Other"], index=0, key="login_gender")
         submitted = st.form_submit_button("Continue")
 
     if submitted:
+        # Save into session_state
         st.session_state["email"] = email.strip().lower()
         st.session_state["phone"] = phone.strip()
         st.session_state["name"] = name.strip()
@@ -367,38 +357,80 @@ def login_page():
         }
         save_user_profile(profile)
 
-        st.session_state["profile_saved"] = True
-        safe_rerun_or_notice()
+        # navigate to Intro page
+        st.session_state["page"] = "Intro"
+        st.stop()
 
 
 def intro_and_health_input():
     st.header("Intro & Quick Check-in")
     name = st.session_state.get("name", "Friend")
     st.subheader(f"Hey! {name} — how are you today?")
-    st.write("This short check will ask a few questions about your health and lifestyle. Choose: Yes / No / Sometimes.")
+    st.write("This short check will ask a few questions about your health and lifestyle. Choose: No / Sometimes / Yes.")
 
     answers = {}
+
+    # helper to map stored answer to radio index
+    def answer_to_index(ans):
+        if not ans:
+            return 0
+        ans = str(ans).lower()
+        return {"no": 0, "sometimes": 1, "yes": 2}.get(ans, 0)
+
     with st.form("health_chat"):
         st.markdown("### Quick health questions")
         for q in QUESTIONS:
-            key = f"q_{q['id']}"
-            answers[q["id"]] = st.radio(q["text"], options=["no", "sometimes", "yes"], index=0, key=key, horizontal=True)
+            key = f"q_{q['id']}_radio"
+            stored = st.session_state.get(f"q_{q['id']}", "no")
+            answers[q["id"]] = st.radio(
+                q["text"],
+                options=["no", "sometimes", "yes"],
+                index=answer_to_index(stored),
+                key=key,
+                horizontal=True,
+            )
+
         st.markdown("### Measurements")
+        # safe defaults (avoid float(None))
+        weight_default = float(st.session_state.get("weight") or 70.0)
+        height_default = float(st.session_state.get("height") or 170.0)
+
         weight = st.number_input(
-            "Weight (kg)", min_value=20.0, max_value=300.0, value=float(st.session_state.get("weight", 70.0))
+            "Weight (kg)",
+            min_value=20.0,
+            max_value=300.0,
+            value=weight_default,
+            format="%.1f",
+            key="input_weight",
         )
         height = st.number_input(
-            "Height (cm)", min_value=80.0, max_value=250.0, value=float(st.session_state.get("height", 170.0))
+            "Height (cm)",
+            min_value=80.0,
+            max_value=250.0,
+            value=height_default,
+            format="%.1f",
+            key="input_height",
         )
+
         submitted = st.form_submit_button("Save & Analyze")
 
     if submitted:
+        # persist answers into session_state
         for k, v in answers.items():
             st.session_state["q_" + k] = v
-        st.session_state["weight"] = float(weight)
-        st.session_state["height"] = float(height)
-        bmi = compute_bmi(weight, height)
-        st.session_state["bmi"] = bmi
+
+        # store numeric values safely
+        try:
+            st.session_state["weight"] = float(weight)
+        except Exception:
+            st.session_state["weight"] = weight_default
+
+        try:
+            st.session_state["height"] = float(height)
+        except Exception:
+            st.session_state["height"] = height_default
+
+        st.session_state["bmi"] = compute_bmi(st.session_state["weight"], st.session_state["height"])
         st.success("Saved measurements.")
 
         profile = {
@@ -407,15 +439,16 @@ def intro_and_health_input():
             "name": st.session_state.get("name"),
             "age": st.session_state.get("age"),
             "gender": st.session_state.get("gender"),
-            "weight": weight,
-            "height": height,
-            "bmi": bmi,
+            "weight": st.session_state.get("weight"),
+            "height": st.session_state.get("height"),
+            "bmi": st.session_state.get("bmi"),
             "data": {"answers": answers},
         }
         save_user_profile(profile)
 
-        st.session_state["profile_saved"] = True
-        safe_rerun_or_notice()
+        # navigate to Risk page
+        st.session_state["page"] = "Risk"
+        st.stop()
 
 
 def risk_and_prescription():
@@ -461,8 +494,8 @@ def risk_and_prescription():
     else:
         default_rx = "Low risk — continue healthy lifestyle: balanced low-salt diet, regular exercise, avoid smoking, maintain healthy weight."
 
-    rx = st.text_area("Prescription / Advice", value=default_rx, height=180)
-    if st.button("Save Prescription"):
+    rx = st.text_area("Prescription / Advice", value=default_rx, height=180, key="prescription_text")
+    if st.button("Save Prescription", key="save_prescription_btn"):
         user = load_user(st.session_state.get("email"))
         if user:
             data = user.get("data", {})
@@ -545,10 +578,10 @@ def reminders_page():
     for r in reminders:
         st.write(f"- {r['time']} — {r['message']}")
 
-    with st.form("add_reminder"):
-        t = st.time_input("Reminder time", value=datetime.now().replace(hour=9, minute=0).time())
-        msg = st.text_input("Message", value="Take medication on time")
-        added = st.form_submit_button("Add reminder")
+    with st.form("add_reminder_form"):
+        t = st.time_input("Reminder time", value=datetime.now().replace(hour=9, minute=0).time(), key="reminder_time")
+        msg = st.text_input("Message", value="Take medication on time", key="reminder_message")
+        added = st.form_submit_button("Add reminder", key="add_reminder_btn")
     if added:
         reminders.append({"time": t.strftime("%H:%M"), "message": msg})
         st.session_state[REMINDERS_KEY] = reminders
@@ -556,13 +589,13 @@ def reminders_page():
 
     st.markdown("### Twilio (optional) — send SMS / Call reminders")
     st.write("If you'd like the app to send SMS or make calls, provide Twilio credentials. This is optional and costs SMS/call credits.")
-    use_twilio = st.checkbox("Enable Twilio reminders (requires credentials)", value=False)
+    use_twilio = st.checkbox("Enable Twilio reminders (requires credentials)", value=False, key="use_twilio")
     if use_twilio:
-        sid = st.text_input("Twilio Account SID")
-        token = st.text_input("Twilio Auth Token", type="password")
-        from_phone = st.text_input("Twilio From Phone (E.164)")
-        to_phone = st.text_input("Recipient Phone (E.164)", value=st.session_state.get("phone", ""))
-        if st.button("Send test SMS now"):
+        sid = st.text_input("Twilio Account SID", key="tw_sid")
+        token = st.text_input("Twilio Auth Token", type="password", key="tw_token")
+        from_phone = st.text_input("Twilio From Phone (E.164)", key="tw_from")
+        to_phone = st.text_input("Recipient Phone (E.164)", value=st.session_state.get("phone", ""), key="tw_to")
+        if st.button("Send test SMS now", key="send_test_sms"):
             if not TWILIO_AVAILABLE:
                 st.error("Twilio SDK not installed. Install `twilio` package.")
             else:
@@ -580,36 +613,47 @@ def reminders_page():
 def main():
     st.title("Hypertension Detection — Demo App")
 
+    # initialize page
+    if "page" not in st.session_state:
+        st.session_state["page"] = "Home"
+
+    # show success message after profile save if present
     if st.session_state.get("profile_saved"):
         st.success("Profile updated successfully.")
         st.session_state.pop("profile_saved", None)
 
-    menu = ["Home / Login", "Intro & Health Input", "Risk & Prescription", "Profile", "Reminders"]
-    choice = st.sidebar.selectbox("Navigation", menu)
+    # sidebar navigation (keeps in sync with session_state.page)
+    menu = ["Home", "Intro", "Risk", "Profile", "Reminders"]
+    current_index = menu.index(st.session_state["page"]) if st.session_state["page"] in menu else 0
+    choice = st.sidebar.radio("Navigate", menu, index=current_index, key="side_nav")
+    if choice != st.session_state["page"]:
+        st.session_state["page"] = choice
 
+    # ensure minimal session keys
     if "email" not in st.session_state:
         st.session_state["email"] = ""
     if "name" not in st.session_state:
         st.session_state["name"] = ""
 
-    if choice == "Home / Login":
+    # route pages
+    if st.session_state["page"] == "Home":
         login_page()
-    elif choice == "Intro & Health Input":
+    elif st.session_state["page"] == "Intro":
         if not st.session_state.get("email"):
             st.info("Please login on the Home page first.")
         else:
             intro_and_health_input()
-    elif choice == "Risk & Prescription":
+    elif st.session_state["page"] == "Risk":
         if not st.session_state.get("email"):
             st.info("Please login on the Home page first.")
         else:
             risk_and_prescription()
-    elif choice == "Profile":
+    elif st.session_state["page"] == "Profile":
         if not st.session_state.get("email"):
             st.info("Please login on the Home page first.")
         else:
             user_profile_page()
-    elif choice == "Reminders":
+    elif st.session_state["page"] == "Reminders":
         if not st.session_state.get("email"):
             st.info("Please login on the Home page first.")
         else:
@@ -618,4 +662,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
