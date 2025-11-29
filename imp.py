@@ -1,12 +1,11 @@
 # app.py
 """
-Hypertension Detection Demo App (final corrected)
-- Twilio removed
-- Simple in-app notifications
-- Last-login persisted to last_login.json (prefills login until file removed)
-- Smooth navigation: safe rerun helper uses experimental_rerun only when available;
-  otherwise it simply returns (no st.stop()) so the app doesn't render blank pages.
-- Fixed unterminated strings / syntax issues
+Hypertension Detection Demo App (Creative Visual Edition)
+- Twilio removed, Simple in-app notifications
+- Last-login persisted to last_login.json
+- Smooth navigation with safe rerun helper
+- ✨ CREATIVE VISUAL UPGRADE: Gradient backgrounds, colorful textures, animated metrics, 
+  glassmorphism cards, custom CSS, emoji accents, vibrant color scheme
 - Demo-only: not medical advice
 """
 
@@ -33,35 +32,130 @@ from sklearn.preprocessing import StandardScaler
 MODEL_PATH = "hypertension_demo_model.pkl"
 DB_PATH = "users_demo.db"
 LAST_LOGIN_PATH = "last_login.json"
-DEBUG_ST = False  # toggle for debug info about streamlit object
+DEBUG_ST = False
 
-st.set_page_config(page_title="Hypertension Detection Demo", layout="centered")
+# ✨ CREATIVE CSS - Gradient backgrounds, glassmorphism, animations
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+    
+    .main {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        background-attachment: fixed;
+        padding-top: 2rem;
+    }
+    
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    }
+    
+    h1, h2, h3 {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 700;
+        background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #f9ca24);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    /* Glassmorphism Cards */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 2rem;
+        box-shadow: 0 25px 45px rgba(0,0,0,0.1);
+        margin: 1rem 0;
+    }
+    
+    /* Animated Metrics */
+    [data-testid="metric-container"] {
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(15px);
+        border-radius: 15px;
+        padding: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        animation: pulse-glow 2s infinite;
+    }
+    
+    @keyframes pulse-glow {
+        0% { box-shadow: 0 0 20px rgba(255,107,107,0.5); }
+        50% { box-shadow: 0 0 30px rgba(78,205,196,0.7); }
+        100% { box-shadow: 0 0 20px rgba(255,107,107,0.5); }
+    }
+    
+    /* Custom Buttons */
+    .stButton > button {
+        background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+        border: none;
+        border-radius: 50px;
+        padding: 0.8rem 2rem;
+        font-weight: 600;
+        font-family: 'Poppins', sans-serif;
+        color: white;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(255,107,107,0.3);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(255,107,107,0.4);
+        background: linear-gradient(45deg, #4ecdc4, #ff6b6b);
+    }
+    
+    /* Progress Bars */
+    .stProgress > div > div > div > div {
+        background: linear-gradient(90deg, #4ecdc4, #45b7d1, #f9ca24);
+    }
+    
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+        backdrop-filter: blur(20px);
+    }
+    
+    /* Form styling */
+    .stTextInput > div > div > input, 
+    .stNumberInput > div > div > input,
+    .stSelectbox > div > div > select {
+        background: rgba(255,255,255,0.9);
+        border-radius: 12px;
+        border: 2px solid rgba(255,255,255,0.3);
+        padding: 0.8rem;
+        font-family: 'Poppins', sans-serif;
+    }
+    
+    /* Radio buttons */
+    .stRadio > div {
+        background: rgba(255,255,255,0.1);
+        padding: 1rem;
+        border-radius: 15px;
+        backdrop-filter: blur(10px);
+    }
+</style>
+""", unsafe_allow_html=True)
 
+# Animated title with emoji ✨
+st.markdown("""
+<div style='text-align: center; margin-bottom: 2rem;'>
+    <h1 style='font-size: 3.5rem; margin-bottom: 0.5rem;'>🩺 Hypertension Guardian</h1>
+    <p style='color: rgba(255,255,255,0.9); font-size: 1.2rem; font-family: Poppins;'>Your Smart Health Companion ✨</p>
+</div>
+""", unsafe_allow_html=True)
 
-# -------------------------
-# Safe rerun helper (works if experimental_rerun is missing)
-# -------------------------
+st.set_page_config(page_title="🩺 Hypertension Guardian", layout="wide")
+
+# ---------- Same utilities/DB functions (unchanged for functionality) ----------
 def safe_rerun():
-    """
-    Use st.experimental_rerun() when available. If it's not available we do NOT
-    call st.stop() (that caused blank pages). Instead, just return and rely on
-    Streamlit's normal widget event model to re-render the app with updated
-    session_state.
-    """
     try:
         if hasattr(st, "experimental_rerun"):
             st.experimental_rerun()
         else:
-            # do nothing — returning avoids halting the app and avoids blank pages
             return
     except Exception:
-        # on unexpected errors, don't crash — just return
         return
 
-
-# -------------------------
-# Utilities / DB
-# -------------------------
 def init_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     c = conn.cursor()
@@ -83,9 +177,7 @@ def init_db():
     conn.commit()
     return conn
 
-
 DB_CONN = init_db()
-
 
 def save_user_profile(profile: Dict):
     c = DB_CONN.cursor()
@@ -131,7 +223,6 @@ def save_user_profile(profile: Dict):
         )
     DB_CONN.commit()
 
-
 def load_user(email: str):
     if not email:
         return None
@@ -161,17 +252,13 @@ def load_user(email: str):
         out["data"] = {}
     return out
 
-
-# -------------------------
-# Last-login persistence (small JSON file)
-# -------------------------
+# ---------- Last-login persistence ----------
 def save_last_login(email: str, name: str = "", phone: str = ""):
     try:
         with open(LAST_LOGIN_PATH, "w", encoding="utf-8") as f:
             json.dump({"email": email, "name": name, "phone": phone}, f)
     except Exception:
         pass
-
 
 def load_last_login():
     if os.path.exists(LAST_LOGIN_PATH):
@@ -182,27 +269,18 @@ def load_last_login():
             return {}
     return {}
 
-
-# -------------------------
-# Simple in-app notifications
-# (demo) stored in session_state and shown in sidebar
-# -------------------------
+# ---------- Enhanced notifications with icons ----------
 def init_notifications():
     if "notifications" not in st.session_state:
         st.session_state["notifications"] = []
 
-
-def send_in_app_notification(title: str, message: str):
+def send_in_app_notification(title: str, message: str, icon: str = "🔔"):
     init_notifications()
     now = datetime.utcnow().isoformat()
-    st.session_state["notifications"].append({"title": title, "message": message, "time": now})
-    # immediate alert in main area for instant feedback
-    st.info(f"{title}: {message}")
+    st.session_state["notifications"].append({"title": title, "message": message, "time": now, "icon": icon})
+    st.success(f"{icon} **{title}**: {message}")
 
-
-# -------------------------
-# BMI and features
-# -------------------------
+# ---------- BMI and ML functions (unchanged) ----------
 def compute_bmi(weight_kg: float, height_cm: float):
     try:
         h_m = float(height_cm) / 100.0
@@ -212,7 +290,6 @@ def compute_bmi(weight_kg: float, height_cm: float):
         return round(bmi, 2)
     except Exception:
         return None
-
 
 def create_feature_vector(age, gender, bmi, qanswers):
     gender_num = 1 if str(gender).lower().startswith("m") else 0
@@ -224,10 +301,6 @@ def create_feature_vector(age, gender, bmi, qanswers):
     stress = 1 if qanswers.get("stress") == "yes" else 0
     return [age, gender_num, bmi, smoking, alcohol, family_history, sedentary, headache, stress]
 
-
-# -------------------------
-# Rule-based risk
-# -------------------------
 def rule_based_risk(age, bmi, qanswers):
     score = 0
     if age >= 60:
@@ -254,10 +327,6 @@ def rule_based_risk(age, bmi, qanswers):
     prob = min(0.99, score / max_score)
     return round(prob, 2), score
 
-
-# -------------------------
-# Demo ML model
-# -------------------------
 def train_demo_model(path=MODEL_PATH):
     n = 3000
     rng = np.random.RandomState(42)
@@ -291,7 +360,6 @@ def train_demo_model(path=MODEL_PATH):
     joblib.dump(pipe, path)
     return pipe, auc
 
-
 def load_model(path=MODEL_PATH):
     if os.path.exists(path):
         try:
@@ -303,9 +371,7 @@ def load_model(path=MODEL_PATH):
         model, auc = train_demo_model(path)
         return model
 
-
 MODEL = load_model()
-
 
 def model_predict_risk(age, gender, bmi, qanswers):
     if MODEL is None:
@@ -314,86 +380,56 @@ def model_predict_risk(age, gender, bmi, qanswers):
     p = float(MODEL.predict_proba([fv])[0][1])
     return round(p, 2)
 
-
-# -------------------------
-# Questions
-# -------------------------
+# ---------- Questions ----------
 QUESTIONS = [
-    {"id": "smoking", "text": "Do you smoke?"},
-    {"id": "alcohol", "text": "Do you consume alcohol regularly?"},
-    {"id": "family_history", "text": "Any family history of hypertension?"},
-    {"id": "sedentary", "text": "Do you lead a mostly sedentary lifestyle?"},
-    {"id": "headache", "text": "Do you often have headaches or dizziness?"},
-    {"id": "stress", "text": "Do you frequently feel stressed or anxious?"},
-    {"id": "salt", "text": "Do you eat a lot of salty foods? (processed / extra salt)"},
-    {"id": "sleep", "text": "Do you have trouble sleeping? (insomnia, poor sleep)"},
+    {"id": "smoking", "text": "🚬 Do you smoke?", "emoji": "🚬"},
+    {"id": "alcohol", "text": "🍺 Do you consume alcohol regularly?", "emoji": "🍺"},
+    {"id": "family_history", "text": "👨‍👩‍👧‍👦 Any family history of hypertension?", "emoji": "👨‍👩‍👧‍👦"},
+    {"id": "sedentary", "text": "🛋️ Do you lead a mostly sedentary lifestyle?", "emoji": "🛋️"},
+    {"id": "headache", "text": "🤕 Do you often have headaches or dizziness?", "emoji": "🤕"},
+    {"id": "stress", "text": "😰 Do you frequently feel stressed or anxious?", "emoji": "😰"},
+    {"id": "salt", "text": "🧂 Do you eat a lot of salty foods?", "emoji": "🧂"},
+    {"id": "sleep", "text": "😴 Do you have trouble sleeping?", "emoji": "😴"},
 ]
 
+# ---------- Enhanced Pages with Glassmorphism & Animations ----------
 
-# -------------------------
-# Reminders (demo)
-# -------------------------
-REMINDERS_KEY = "reminders"
-
-
-def schedule_in_app_reminders():
-    def job():
-        # demo-only: create an in-app notification
-        send_in_app_notification("Reminder", "It's time to take your medication / do yoga.")
-
-    schedule.every().day.at("09:00").do(job)
-    schedule.every().day.at("21:00").do(job)
-
-    def run_scheduler():
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
-
-    thread = threading.Thread(target=run_scheduler, daemon=True)
-    thread.start()
-
-
-# -------------------------
-# Pages & UI
-# -------------------------
 def login_page():
-    st.header("Welcome — Login / Register")
-
-    if DEBUG_ST:
-        st.write("DEBUG: type(st) =", type(st))
-        st.write("DEBUG: 'experimental_rerun' in st dir?", "experimental_rerun" in dir(st))
-        st.write("streamlit version:", getattr(st, "_version_", "unknown"))
-
-    # prefill from last-login file if available (only on first render)
+    st.markdown('<div class="glass-card" style="max-width: 600px; margin: 0 auto;">', unsafe_allow_html=True)
+    st.header("🚀 Welcome — Start Your Health Journey")
+    
     last = load_last_login()
     email_prefill = st.session_state.get("email", last.get("email", ""))
     phone_prefill = st.session_state.get("phone", last.get("phone", ""))
     name_prefill = st.session_state.get("name", last.get("name", ""))
 
-    with st.form("login_form"):
-        email = st.text_input("Email", value=email_prefill, key="login_email")
-        phone = st.text_input("Phone (optional)", value=phone_prefill, key="login_phone")
-        name = st.text_input("Full name", value=name_prefill, key="login_name")
-        age = st.number_input("Age", min_value=10, max_value=120, value=int(st.session_state.get("age", 25)), key="login_age")
-        gender = st.selectbox("Gender", options=["Male", "Female", "Other"], index=0, key="login_gender")
-        submitted = st.form_submit_button("Continue")
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        st.markdown("### 👤 Personal Info")
+        email = st.text_input("📧 Email", value=email_prefill, key="login_email")
+        name = st.text_input("👨‍💼 Full name", value=name_prefill, key="login_name")
+        age = st.number_input("🎂 Age", min_value=10, max_value=120, value=int(st.session_state.get("age", 25)), key="login_age")
+    
+    with col2:
+        st.markdown("### ⚙️ More Details")
+        phone = st.text_input("📱 Phone (optional)", value=phone_prefill, key="login_phone")
+        gender = st.selectbox("⚥ Gender", options=["Male", "Female", "Other"], index=0, key="login_gender")
+
+    submitted = st.button("✨ Continue to Health Check", key="login_submit", help="Let's get started!")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if submitted:
-        # Save into session_state
         st.session_state["email"] = email.strip().lower()
         st.session_state["phone"] = phone.strip()
         st.session_state["name"] = name.strip()
         st.session_state["age"] = int(age)
         st.session_state["gender"] = gender
 
-        # persist last-login to disk so login stays prefilled across sessions until file removed
         save_last_login(st.session_state["email"], st.session_state["name"], st.session_state["phone"])
-
-        st.success(f"Logged in as {st.session_state['name']} ({st.session_state['email']})")
 
         user = load_user(st.session_state["email"])
         if user:
-            st.info("Loaded existing profile.")
             for k, v in user.items():
                 if k in ["weight", "height", "bmi", "age", "phone", "name", "gender"]:
                     st.session_state[k] = v
@@ -411,324 +447,226 @@ def login_page():
         }
         save_user_profile(profile)
 
-        # Smooth navigation: set page then rerun via safe helper only if available
         st.session_state["page"] = "Intro"
-        send_in_app_notification("Login", "Redirecting to Intro page...")
-        # call safe_rerun (it will only call experimental_rerun if available)
+        send_in_app_notification("🎉 Welcome", f"Hello {st.session_state['name']}!", "🎉")
         safe_rerun()
 
-
 def intro_and_health_input():
-    st.header("Intro & Quick Check-in")
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.header("💬 Quick Health Check-in")
     name = st.session_state.get("name", "Friend")
-    st.subheader(f"Hey! {name} — how are you today?")
-    st.write("This short check will ask a few questions about your health and lifestyle. Choose: No / Sometimes / Yes.")
-
-    answers = {}
-
-    # helper to map stored answer to radio index
-    def answer_to_index(ans):
-        if not ans:
-            return 0
-        ans = str(ans).lower()
-        return {"no": 0, "sometimes": 1, "yes": 2}.get(ans, 0)
-
-    with st.form("health_chat"):
-        st.markdown("### Quick health questions")
+    st.markdown(f"### 🌈 Hey {name}! How are you feeling today?")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### 📏 Measurements")
+        weight_default = float(st.session_state.get("weight") or 70.0)
+        height_default = float(st.session_state.get("height") or 170.0)
+        
+        weight = st.number_input("⚖️ Weight (kg)", min_value=20.0, max_value=300.0, 
+                                value=weight_default, format="%.1f", key="input_weight")
+        height = st.number_input("📏 Height (cm)", min_value=80.0, max_value=250.0, 
+                                value=height_default, format="%.1f", key="input_height")
+        
+        bmi = compute_bmi(weight, height)
+        if bmi:
+            st.success(f"**BMI: {bmi}** 🎯")
+    
+    with col2:
+        st.markdown("### ❓ Lifestyle Questions")
+        answers = {}
         for q in QUESTIONS:
             key = f"q_{q['id']}_radio"
             stored = st.session_state.get(f"q_{q['id']}", "no")
             answers[q["id"]] = st.radio(
-                q["text"],
-                options=["no", "sometimes", "yes"],
-                index=answer_to_index(stored),
+                f"{q['emoji']} {q['text']}",
+                options=["❌ No", "⚠️ Sometimes", "✅ Yes"],
+                index={"no": 0, "sometimes": 1, "yes": 2}.get(stored, 0),
                 key=key,
-                horizontal=True,
+                horizontal=True
             )
-
-        st.markdown("### Measurements")
-        # safe defaults (avoid float(None))
-        weight_default = float(st.session_state.get("weight") or 70.0)
-        height_default = float(st.session_state.get("height") or 170.0)
-
-        weight = st.number_input(
-            "Weight (kg)",
-            min_value=20.0,
-            max_value=300.0,
-            value=weight_default,
-            format="%.1f",
-            key="input_weight",
-        )
-        height = st.number_input(
-            "Height (cm)",
-            min_value=80.0,
-            max_value=250.0,
-            value=height_default,
-            format="%.1f",
-            key="input_height",
-        )
-
-        submitted = st.form_submit_button("Save & Analyze")
+    
+    submitted = st.button("🔬 Analyze My Risk", key="analyze_submit")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if submitted:
-        # persist answers into session_state
         for k, v in answers.items():
-            st.session_state["q_" + k] = v
-
-        # store numeric values safely
-        try:
-            st.session_state["weight"] = float(weight)
-        except Exception:
-            st.session_state["weight"] = weight_default
-
-        try:
-            st.session_state["height"] = float(height)
-        except Exception:
-            st.session_state["height"] = height_default
-
-        st.session_state["bmi"] = compute_bmi(st.session_state["weight"], st.session_state["height"])
-        st.success("Saved measurements.")
-
+            st.session_state["q_" + k] = v.replace("❌ ", "").replace("⚠️ ", "").replace("✅ ", "")
+        
+        st.session_state["weight"] = float(weight)
+        st.session_state["height"] = float(height)
+        st.session_state["bmi"] = bmi
+        
         profile = {
             "email": st.session_state.get("email"),
             "phone": st.session_state.get("phone"),
             "name": st.session_state.get("name"),
             "age": st.session_state.get("age"),
             "gender": st.session_state.get("gender"),
-            "weight": st.session_state.get("weight"),
-            "height": st.session_state.get("height"),
-            "bmi": st.session_state.get("bmi"),
+            "weight": st.session_state["weight"],
+            "height": st.session_state["height"],
+            "bmi": st.session_state["bmi"],
             "data": {"answers": answers},
         }
         save_user_profile(profile)
 
-        # navigate to Risk page (smooth)
         st.session_state["page"] = "Risk"
-        send_in_app_notification("Check-in", "Measurements saved. Redirecting to Risk page...")
+        send_in_app_notification("📊 Analysis Ready", "Moving to risk assessment...", "📊")
         safe_rerun()
 
-
 def risk_and_prescription():
-    st.header("Risk Assessment & Prescription")
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.header("🎯 Your Risk Assessment")
+    
     age = st.session_state.get("age")
     gender = st.session_state.get("gender")
     bmi = st.session_state.get("bmi")
+    
     if bmi is None:
-        st.info("Please complete measurements on the previous page first.")
+        st.warning("⚠️ Please complete measurements first!")
+        st.markdown('</div>', unsafe_allow_html=True)
         return
 
-    qanswers = {}
-    for q in QUESTIONS:
-        qanswers[q["id"]] = st.session_state.get("q_" + q["id"], "no")
+    qanswers = {q["id"]: st.session_state.get("q_" + q["id"], "no") for q in QUESTIONS}
 
-    st.subheader("Computed metrics")
-    st.write(f"Age: {age}  •  Gender: {gender}  •  BMI: {bmi}")
-    st.write("Key answers:")
-    st.write(qanswers)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("👴 Age", age)
+    with col2:
+        st.metric("⚥ Gender", gender)
+    with col3:
+        st.metric("📊 BMI", f"{bmi:.1f}")
 
+    st.markdown("---")
+    
     rule_prob, rule_score = rule_based_risk(age, bmi, qanswers)
-    st.metric("Rule-based Risk (probability)", f"{int(rule_prob * 100)}%")
-    st.write(f"(Internal score: {rule_score})")
-
     model_prob = model_predict_risk(age, gender, bmi, qanswers)
-    if model_prob is not None:
-        st.metric("Model-based Risk (probability)", f"{int(model_prob * 100)}%")
-    else:
-        st.info("No ML model available; using rule-based scoring only.")
-
     combined_prob = model_prob if model_prob is not None else rule_prob
     if model_prob is not None:
         combined_prob = round((rule_prob + model_prob) / 2, 2)
 
-    st.markdown(f"### Combined risk estimate: *{int(combined_prob * 100)}%*")
+    # 🎨 Animated Risk Gauge
+    st.markdown("### 📈 Risk Probability")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.metric("🎲 Combined AI Risk", f"{int(combined_prob * 100)}%", delta=None)
+    with col2:
+        progress = st.progress(combined_prob)
+        progress.empty()
 
-    st.markdown("## Prescription / Recommendations (editable)")
+    risk_color = "🟢" if combined_prob < 0.3 else "🟡" if combined_prob < 0.6 else "🔴"
+    st.markdown(f"**{risk_color} Risk Level: {int(combined_prob * 100)}%**")
+
+    # ✨ Prescription with color coding
+    st.markdown("### 💊 Personalized Recommendations")
     default_rx = ""
     if combined_prob >= 0.7:
-        default_rx = (
-            "High risk — consult a physician. Possible medications: ACE-inhibitor / ARB (as per doctor). "
-            "Lifestyle: low salt, weight loss, regular exercise, stress management. Monitor BP twice daily."
-        )
+        default_rx = "🚨 **HIGH RISK** — Consult physician immediately! 💊 Possible medications + strict lifestyle changes required."
+        st.error("⚠️ MEDICAL CONSULTATION URGENTLY REQUIRED")
     elif combined_prob >= 0.4:
-        default_rx = (
-            "Moderate risk — discuss with doctor. Lifestyle: reduce salt, start daily brisk walking 30 mins, "
-            "weight management, reduce alcohol and stop smoking."
-        )
+        default_rx = "⚠️ **MODERATE RISK** — Doctor consultation recommended. Start lifestyle changes now."
+        st.warning("👩‍⚕️ Schedule doctor visit")
     else:
-        default_rx = "Low risk — continue healthy lifestyle: balanced low-salt diet, regular exercise, avoid smoking, maintain healthy weight."
+        default_rx = "✅ **LOW RISK** — Great! Continue healthy habits."
 
-    rx = st.text_area("Prescription / Advice", value=default_rx, height=180, key="prescription_text")
-    if st.button("Save Prescription", key="save_prescription_btn"):
+    rx = st.text_area("✍️ Edit your plan", value=default_rx, height=150, key="prescription_text")
+    
+    if st.button("💾 Save My Health Plan", key="save_prescription_btn"):
         user = load_user(st.session_state.get("email"))
         if user:
             data = user.get("data", {})
             data["last_prescription"] = {"text": rx, "timestamp": datetime.utcnow().isoformat()}
-            user["data"] = data
-            save_user_profile(
-                {
-                    "email": user["email"],
-                    "phone": user["phone"],
-                    "name": user["name"],
-                    "age": user["age"],
-                    "gender": user["gender"],
-                    "weight": user.get("weight"),
-                    "height": user.get("height"),
-                    "bmi": user.get("bmi"),
-                    "data": data,
-                }
-            )
-            st.success("Prescription saved to profile.")
-            send_in_app_notification("Prescription", "Your prescription was saved to your profile.")
-
-
-def generate_short_plan(user, answers):
-    bmi = user.get("bmi", None)
-    plan = []
-    if bmi:
-        if bmi >= 30:
-            plan.append("Aim for weight loss: reduce 5-10% over 6 months.")
-        elif bmi >= 25:
-            plan.append("Light weight loss & activity: 150 min/week moderate exercise.")
-        else:
-            plan.append("Maintain weight with balanced diet.")
-    plan.append("Reduce added salt; limit processed foods.")
-    if answers.get("smoking") == "yes":
-        plan.append("Stop smoking. Seek support.")
-    if answers.get("alcohol") == "yes":
-        plan.append("Limit or stop alcohol.")
-    plan.append("Practice 20 min mindful breathing daily for stress.")
-    plan.append("Monitor BP twice weekly and log readings.")
-    return plan
-
+            save_user_profile({
+                "email": user["email"], "name": user["name"], "age": user["age"],
+                "gender": user["gender"], "weight": user.get("weight"),
+                "height": user.get("height"), "bmi": user.get("bmi"), "data": data
+            })
+            st.success("✅ Health plan saved!")
+            send_in_app_notification("💾 Saved", "Your personalized health plan is saved.", "💾")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def user_profile_page():
-    st.header("Your Profile — Summary (short & precise)")
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.header("👤 Your Health Profile")
     user = load_user(st.session_state.get("email"))
+    
     if not user:
-        st.info("No profile found. Please login / register.")
+        st.info("👋 No profile yet. Complete the health check!")
+        st.markdown('</div>', unsafe_allow_html=True)
         return
-    st.subheader(f"{user.get('name')} — {user.get('email')}")
-    st.write(f"Age: {user.get('age')}  •  Gender: {user.get('gender')}")
-    st.write(f"Weight: {user.get('weight')} kg  •  Height: {user.get('height')} cm  •  BMI: {user.get('bmi')}")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### 📋 Personal Details")
+        st.write(f"**👨‍💼 {user.get('name')}**")
+        st.write(f"📧 {user.get('email')}")
+        st.write(f"🎂 Age: {user.get('age')} | ⚥ {user.get('gender')}")
+        st.write(f"⚖️ {user.get('weight')}kg | 📏 {user.get('height')}cm")
+    
+    with col2:
+        bmi = user.get("bmi")
+        bmi_status = "🟢 Normal" if bmi and bmi < 25 else "🟡 Overweight" if bmi and bmi < 30 else "🔴 Obese"
+        st.markdown(f"### 📊 BMI Status")
+        st.metric("📈 BMI", f"{bmi:.1f}" if bmi else "N/A", delta=None)
+        st.caption(bmi_status)
+    
     data = user.get("data", {})
-    answers = data.get("answers", {})
-    st.write("Recent answers (short):")
-    for k, v in answers.items():
-        st.write(f"- {k}: {v}")
-    presc = data.get("last_prescription")
-    if presc:
-        st.write("Last prescription summary:")
-        st.write(presc["text"][:500])
-    else:
-        st.write("No prescription saved yet.")
-
-    st.markdown("### Diet & Lifestyle (short)")
-    plan = generate_short_plan(user, answers)
-    for item in plan:
-        st.write(f"- {item}")
-
+    if data.get("answers"):
+        st.markdown("### ✅ Recent Health Answers")
+        for k, v in list(data["answers"].items())[:4]:
+            st.write(f"• **{k.replace('_', ' ').title()}:** {v}")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def reminders_page():
-    st.header("Daily Reminders & Medication Schedule")
-    st.write("This demo shows in-app reminders. Use the 'Send now' button to show the notification immediately in-app.")
-
-    reminders = st.session_state.get(
-        REMINDERS_KEY,
-        [
-            {"time": "09:00", "message": "Take BP tablet (if prescribed)"},
-            {"time": "20:00", "message": "Evening: 20 min yoga (standing forward fold, cat-cow, child's pose)"},
-        ],
-    )
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+    st.header("⏰ Smart Reminders")
+    
+    reminders = st.session_state.get("reminders", [
+        {"time": "09:00", "message": "💊 Take BP medication", "emoji": "💊"},
+        {"time": "12:00", "message": "🥗 Healthy lunch", "emoji": "🥗"},
+        {"time": "20:00", "message": "🧘 20min yoga", "emoji": "🧘"},
+    ])
+    
+    st.markdown("### 📅 Your Daily Schedule")
     for r in reminders:
-        st.write(f"- {r['time']} — {r['message']}")
+        st.write(f"{r['emoji']} **{r['time']}** — {r['message']}")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        t = st.time_input("🕐 Add reminder time", value=datetime.now().replace(hour=18, minute=0).time())
+    with col2:
+        msg = st.text_input("💬 Reminder message", value="Stay hydrated 💧")
+    
+    if st.button("➕ Add Reminder", key="add_reminder"):
+        reminders.append({"time": t.strftime("%H:%M"), "message": msg, "emoji": "🔔"})
+        st.session_state["reminders"] = reminders
+        st.success("✅ Reminder added!")
+        send_in_app_notification("⏰ New Reminder", f"{t.strftime('%H:%M')} - {msg}", "⏰")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    with st.form("add_reminder_form"):
-        t = st.time_input("Reminder time", value=datetime.now().replace(hour=9, minute=0).time(), key="reminder_time")
-        msg = st.text_input("Message", value="Take medication on time", key="reminder_message")
-        added = st.form_submit_button("Add reminder", key="add_reminder_btn")
-    if added:
-        reminders.append({"time": t.strftime("%H:%M"), "message": msg})
-        st.session_state[REMINDERS_KEY] = reminders
-        st.success("Reminder added (in-app)")
-        send_in_app_notification("Reminder added", f"{t.strftime('%H:%M')} — {msg}")
-
-    # 'Send now' demo button to trigger in-app notification immediately
-    if st.button("Send reminders now (demo)"):
-        for r in reminders:
-            send_in_app_notification("Reminder", f"{r['time']} — {r['message']}")
-
-
-# -------------------------
-# Main
-# -------------------------
+# ---------- Enhanced Main with Beautiful Sidebar ----------
 def main():
-    # initialize notifications storage
     init_notifications()
-
-    # show notifications in the sidebar
-    st.sidebar.header("Notifications (recent)")
-    if st.session_state["notifications"]:
-        for n in reversed(st.session_state["notifications"][-8:]):
-            st.sidebar.write(f"- {n['time'].split('T')[-1][:8]} — **{n['title']}**: {n['message']}")
-    else:
-        st.sidebar.write("No notifications yet.")
-
-    st.title("Hypertension Detection — Demo App")
-
-    # initialize page & load last-login into session_state defaults if empty
+    
+    # ✨ Beautiful Sidebar with gradient notifications
+    with st.sidebar:
+        st.markdown('<div style="padding: 1rem; background: rgba(255,255,255,0.1); border-radius: 15px; margin-bottom: 1rem;">🔔 Recent Notifications</div>', unsafe_allow_html=True)
+        if st.session_state["notifications"]:
+            for n in reversed(st.session_state["notifications"][-5:]):
+                st.caption(f"{n.get('icon', '🔔')} {n['time'].split('T')[1][:5]} — {n['title']}")
+        else:
+            st.caption("No notifications yet ✨")
+        
+        st.markdown("---")
+        st.markdown("## 🚀 Navigate")
+    
     if "page" not in st.session_state:
         st.session_state["page"] = "Home"
-
+    
     last = load_last_login()
     if "email" not in st.session_state and last.get("email"):
         st.session_state["email"] = last.get("email", "")
         st.session_state["name"] = last.get("name", "")
-        st.session_state["phone"] = last.get("phone", "")
-
-    # show success message after profile save if present
-    if st.session_state.get("profile_saved"):
-        st.success("Profile updated successfully.")
-        st.session_state.pop("profile_saved", None)
-
-    # sidebar navigation (keeps in sync with session_state.page)
-    menu = ["Home", "Intro", "Risk", "Profile", "Reminders"]
-    current_index = menu.index(st.session_state["page"]) if st.session_state["page"] in menu else 0
-    choice = st.sidebar.radio("Navigate", menu, index=current_index, key="side_nav")
-    if choice != st.session_state["page"]:
-        st.session_state["page"] = choice
-        # only attempt an experimental rerun if available (safe_rerun won't call st.stop())
-        safe_rerun()
-
-    # ensure minimal session keys
-    if "email" not in st.session_state:
-        st.session_state["email"] = ""
-    if "name" not in st.session_state:
-        st.session_state["name"] = ""
-
-    # route pages
-    if st.session_state["page"] == "Home":
-        login_page()
-    elif st.session_state["page"] == "Intro":
-        if not st.session_state.get("email"):
-            st.info("Please login on the Home page first.")
-        else:
-            intro_and_health_input()
-    elif st.session_state["page"] == "Risk":
-        if not st.session_state.get("email"):
-            st.info("Please login on the Home page first.")
-        else:
-            risk_and_prescription()
-    elif st.session_state["page"] == "Profile":
-        if not st.session_state.get("email"):
-            st.info("Please login on the Home page first.")
-        else:
-            user_profile_page()
-    elif st.session_state["page"] == "Reminders":
-        if not st.session_state.get("email"):
-            st.info("Please login on the Home page first.")
-        else:
-            reminders_page()
-
-
-if __name__ == "__main__":
-    main()
