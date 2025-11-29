@@ -1,10 +1,10 @@
 # app.py
 """
 Hypertension Detection Demo App (patched)
-- Robust navigation via st.session_state['page']
-- All forms have submit buttons
-- Safe defaults for numeric inputs
-- Unique widget keys to avoid collisions
+- Twilio removed
+- Simple in-app notifications
+- Last-login persisted to last_login.json (prefills login until file removed)
+- Smooth navigation: login Continue redirects to Intro immediately via experimental_rerun
 - Demo-only: not medical advice
 """
 
@@ -27,20 +27,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-# Optional Twilio import (not required)
-try:
-    from twilio.rest import Client as TwilioClient
-
-    TWILIO_AVAILABLE = True
-except Exception:
-    TWILIO_AVAILABLE = False
-
 # ---------- Config ----------
 MODEL_PATH = "hypertension_demo_model.pkl"
 DB_PATH = "users_demo.db"
+LAST_LOGIN_PATH = "last_login.json"
 DEBUG_ST = False  # toggle for debug info about streamlit object
 
 st.set_page_config(page_title="Hypertension Detection Demo", layout="centered")
+
 
 # -------------------------
 # Utilities / DB
@@ -143,6 +137,44 @@ def load_user(email: str):
     except Exception:
         out["data"] = {}
     return out
+
+
+# -------------------------
+# Last-login persistence (small JSON file)
+# -------------------------
+def save_last_login(email: str, name: str = "", phone: str = ""):
+    try:
+        with open(LAST_LOGIN_PATH, "w", encoding="utf-8") as f:
+            json.dump({"email": email, "name": name, "phone": phone}, f)
+    except Exception:
+        pass
+
+
+def load_last_login():
+    if os.path.exists(LAST_LOGIN_PATH):
+        try:
+            with open(LAST_LOGIN_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+# -------------------------
+# Simple in-app notifications
+# (demo) stored in session_state and shown in sidebar
+# -------------------------
+def init_notifications():
+    if "notifications" not in st.session_state:
+        st.session_state["notifications"] = []
+
+
+def send_in_app_notification(title: str, message: str):
+    init_notifications()
+    now = datetime.utcnow().isoformat()
+    st.session_state["notifications"].append({"title": title, "message": message, "time": now})
+    # also show an immediate alert in main area for instant feedback
+    st.info(f"{title}: {message}")
 
 
 # -------------------------
@@ -283,7 +315,8 @@ REMINDERS_KEY = "reminders"
 
 def schedule_in_app_reminders():
     def job():
-        print("[Reminder Job] It's time to take your medication / do yoga.")
+        # this is a demo-only print; the real 'notification' is in-app notification list
+        send_in_app_notification("Reminder", "It's time to take your medication / do yoga.")
 
     schedule.every().day.at("09:00").do(job)
     schedule.every().day.at("21:00").do(job)
@@ -298,17 +331,6 @@ def schedule_in_app_reminders():
 
 
 # -------------------------
-# Twilio helper (optional)
-# -------------------------
-def send_sms_via_twilio(to_phone, message, account_sid, auth_token, from_phone):
-    if not TWILIO_AVAILABLE:
-        raise RuntimeError("Twilio package not available. Install twilio.")
-    client = TwilioClient(account_sid, auth_token)
-    message = client.messages.create(body=message, from_=from_phone, to=to_phone)
-    return message.sid
-
-
-# -------------------------
 # Pages & UI
 # -------------------------
 def login_page():
@@ -319,10 +341,16 @@ def login_page():
         st.write("DEBUG: 'experimental_rerun' in st dir?", "experimental_rerun" in dir(st))
         st.write("streamlit version:", getattr(st, "_version_", "unknown"))
 
+    # prefill from last-login file if available (only on first render)
+    last = load_last_login()
+    email_prefill = st.session_state.get("email", last.get("email", ""))
+    phone_prefill = st.session_state.get("phone", last.get("phone", ""))
+    name_prefill = st.session_state.get("name", last.get("name", ""))
+
     with st.form("login_form"):
-        email = st.text_input("Email", value=st.session_state.get("email", ""), key="login_email")
-        phone = st.text_input("Phone (optional)", value=st.session_state.get("phone", ""), key="login_phone")
-        name = st.text_input("Full name", value=st.session_state.get("name", ""), key="login_name")
+        email = st.text_input("Email", value=email_prefill, key="login_email")
+        phone = st.text_input("Phone (optional)", value=phone_prefill, key="login_phone")
+        name = st.text_input("Full name", value=name_prefill, key="login_name")
         age = st.number_input("Age", min_value=10, max_value=120, value=int(st.session_state.get("age", 25)), key="login_age")
         gender = st.selectbox("Gender", options=["Male", "Female", "Other"], index=0, key="login_gender")
         submitted = st.form_submit_button("Continue")
@@ -334,6 +362,9 @@ def login_page():
         st.session_state["name"] = name.strip()
         st.session_state["age"] = int(age)
         st.session_state["gender"] = gender
+
+        # persist last-login to disk so login stays prefilled across sessions until file removed
+        save_last_login(st.session_state["email"], st.session_state["name"], st.session_state["phone"])
 
         st.success(f"Logged in as {st.session_state['name']} ({st.session_state['email']})")
 
@@ -357,9 +388,11 @@ def login_page():
         }
         save_user_profile(profile)
 
-        # navigate to Intro page
+        # Smooth navigation: set page then rerun immediately
         st.session_state["page"] = "Intro"
-        st.stop()
+        # small immediate notification
+        send_in_app_notification("Login", "Redirecting to Intro page...")
+        st.experimental_rerun()
 
 
 def intro_and_health_input():
@@ -446,9 +479,10 @@ def intro_and_health_input():
         }
         save_user_profile(profile)
 
-        # navigate to Risk page
+        # navigate to Risk page (smooth)
         st.session_state["page"] = "Risk"
-        st.stop()
+        send_in_app_notification("Check-in", "Measurements saved. Redirecting to Risk page...")
+        st.experimental_rerun()
 
 
 def risk_and_prescription():
@@ -515,6 +549,7 @@ def risk_and_prescription():
                 }
             )
             st.success("Prescription saved to profile.")
+            send_in_app_notification("Prescription", "Your prescription was saved to your profile.")
 
 
 def generate_short_plan(user, answers):
@@ -566,7 +601,7 @@ def user_profile_page():
 
 def reminders_page():
     st.header("Daily Reminders & Medication Schedule")
-    st.write("This demo can show in-app reminders. For real SMS or call reminders, configure Twilio credentials below.")
+    st.write("This demo shows in-app reminders. Use the 'Send now' button to show the notification immediately in-app.")
 
     reminders = st.session_state.get(
         REMINDERS_KEY,
@@ -586,36 +621,40 @@ def reminders_page():
         reminders.append({"time": t.strftime("%H:%M"), "message": msg})
         st.session_state[REMINDERS_KEY] = reminders
         st.success("Reminder added (in-app)")
+        send_in_app_notification("Reminder added", f"{t.strftime('%H:%M')} — {msg}")
 
-    st.markdown("### Twilio (optional) — send SMS / Call reminders")
-    st.write("If you'd like the app to send SMS or make calls, provide Twilio credentials. This is optional and costs SMS/call credits.")
-    use_twilio = st.checkbox("Enable Twilio reminders (requires credentials)", value=False, key="use_twilio")
-    if use_twilio:
-        sid = st.text_input("Twilio Account SID", key="tw_sid")
-        token = st.text_input("Twilio Auth Token", type="password", key="tw_token")
-        from_phone = st.text_input("Twilio From Phone (E.164)", key="tw_from")
-        to_phone = st.text_input("Recipient Phone (E.164)", value=st.session_state.get("phone", ""), key="tw_to")
-        if st.button("Send test SMS now", key="send_test_sms"):
-            if not TWILIO_AVAILABLE:
-                st.error("Twilio SDK not installed. Install twilio package.")
-            else:
-                try:
-                    for r in reminders:
-                        sid_resp = send_sms_via_twilio(to_phone, f"Reminder: {r['message']} at {r['time']}", sid, token, from_phone)
-                    st.success("Test messages sent.")
-                except Exception as e:
-                    st.error(f"Failed to send SMS: {e}")
+    # 'Send now' demo button to trigger in-app notification immediately
+    if st.button("Send reminders now (demo)"):
+        for r in reminders:
+            send_in_app_notification("Reminder", f"{r['time']} — {r['message']}")
 
 
 # -------------------------
 # Main
 # -------------------------
 def main():
+    # initialize notifications storage
+    init_notifications()
+
+    # show notifications in the sidebar
+    st.sidebar.header("Notifications (recent)")
+    if st.session_state["notifications"]:
+        for n in reversed(st.session_state["notifications"][-8:]):
+            st.sidebar.write(f"- {n['time'].split('T')[-1][:8]} — **{n['title']}**: {n['message']}")
+    else:
+        st.sidebar.write("No notifications yet.")
+
     st.title("Hypertension Detection — Demo App")
 
-    # initialize page
+    # initialize page & load last-login into session_state defaults if empty
     if "page" not in st.session_state:
         st.session_state["page"] = "Home"
+
+    last = load_last_login()
+    if "email" not in st.session_state and last.get("email"):
+        st.session_state["email"] = last.get("email", "")
+        st.session_state["name"] = last.get("name", "")
+        st.session_state["phone"] = last.get("phone", "")
 
     # show success message after profile save if present
     if st.session_state.get("profile_saved"):
@@ -628,6 +667,8 @@ def main():
     choice = st.sidebar.radio("Navigate", menu, index=current_index, key="side_nav")
     if choice != st.session_state["page"]:
         st.session_state["page"] = choice
+        # smooth rerun when navigation changes
+        st.experimental_rerun()
 
     # ensure minimal session keys
     if "email" not in st.session_state:
