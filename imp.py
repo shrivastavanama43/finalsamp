@@ -4,7 +4,8 @@ Hypertension Detection Demo App (final corrected)
 - Twilio removed
 - Simple in-app notifications
 - Last-login persisted to last_login.json (prefills login until file removed)
-- Smooth navigation: safe rerun helper used instead of direct st.experimental_rerun()
+- Smooth navigation: safe rerun helper uses experimental_rerun only when available;
+  otherwise it simply returns (no st.stop()) so the app doesn't render blank pages.
 - Fixed unterminated strings / syntax issues
 - Demo-only: not medical advice
 """
@@ -42,17 +43,20 @@ st.set_page_config(page_title="Hypertension Detection Demo", layout="centered")
 # -------------------------
 def safe_rerun():
     """
-    Try immediate rerun if supported; otherwise stop the script.
-    Using st.stop() as a fallback avoids AttributeError crashes while still
-    allowing session_state changes to take effect on the next user interaction.
+    Use st.experimental_rerun() when available. If it's not available we do NOT
+    call st.stop() (that caused blank pages). Instead, just return and rely on
+    Streamlit's normal widget event model to re-render the app with updated
+    session_state.
     """
     try:
         if hasattr(st, "experimental_rerun"):
             st.experimental_rerun()
         else:
-            st.stop()
+            # do nothing — returning avoids halting the app and avoids blank pages
+            return
     except Exception:
-        st.stop()
+        # on unexpected errors, don't crash — just return
+        return
 
 
 # -------------------------
@@ -407,9 +411,10 @@ def login_page():
         }
         save_user_profile(profile)
 
-        # Smooth navigation: set page then rerun via safe helper
+        # Smooth navigation: set page then rerun via safe helper only if available
         st.session_state["page"] = "Intro"
         send_in_app_notification("Login", "Redirecting to Intro page...")
+        # call safe_rerun (it will only call experimental_rerun if available)
         safe_rerun()
 
 
@@ -691,7 +696,7 @@ def main():
     choice = st.sidebar.radio("Navigate", menu, index=current_index, key="side_nav")
     if choice != st.session_state["page"]:
         st.session_state["page"] = choice
-        # smooth rerun when navigation changes
+        # only attempt an experimental rerun if available (safe_rerun won't call st.stop())
         safe_rerun()
 
     # ensure minimal session keys
