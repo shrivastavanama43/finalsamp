@@ -1,10 +1,11 @@
 # app.py
 """
-Hypertension Detection Demo App (patched)
+Hypertension Detection Demo App (final corrected)
 - Twilio removed
 - Simple in-app notifications
 - Last-login persisted to last_login.json (prefills login until file removed)
 - Smooth navigation: safe rerun helper used instead of direct st.experimental_rerun()
+- Fixed unterminated strings / syntax issues
 - Demo-only: not medical advice
 """
 
@@ -539,9 +540,15 @@ def risk_and_prescription():
     st.markdown("## Prescription / Recommendations (editable)")
     default_rx = ""
     if combined_prob >= 0.7:
-        default_rx = "High risk — consult a physician. Possible medications: ACE-inhibitor / ARB (as per doctor). Lifestyle: low salt, weight loss, regular exercise, stress management. Monitor BP twice daily."
+        default_rx = (
+            "High risk — consult a physician. Possible medications: ACE-inhibitor / ARB (as per doctor). "
+            "Lifestyle: low salt, weight loss, regular exercise, stress management. Monitor BP twice daily."
+        )
     elif combined_prob >= 0.4:
-        default_rx = "Moderate risk — discuss with doctor. Lifestyle: reduce salt, start daily brisk walking 30 mins, weight management, reduce alcohol and stop smoking."
+        default_rx = (
+            "Moderate risk — discuss with doctor. Lifestyle: reduce salt, start daily brisk walking 30 mins, "
+            "weight management, reduce alcohol and stop smoking."
+        )
     else:
         default_rx = "Low risk — continue healthy lifestyle: balanced low-salt diet, regular exercise, avoid smoking, maintain healthy weight."
 
@@ -560,4 +567,163 @@ def risk_and_prescription():
                     "age": user["age"],
                     "gender": user["gender"],
                     "weight": user.get("weight"),
-                    "height": user.get("hei
+                    "height": user.get("height"),
+                    "bmi": user.get("bmi"),
+                    "data": data,
+                }
+            )
+            st.success("Prescription saved to profile.")
+            send_in_app_notification("Prescription", "Your prescription was saved to your profile.")
+
+
+def generate_short_plan(user, answers):
+    bmi = user.get("bmi", None)
+    plan = []
+    if bmi:
+        if bmi >= 30:
+            plan.append("Aim for weight loss: reduce 5-10% over 6 months.")
+        elif bmi >= 25:
+            plan.append("Light weight loss & activity: 150 min/week moderate exercise.")
+        else:
+            plan.append("Maintain weight with balanced diet.")
+    plan.append("Reduce added salt; limit processed foods.")
+    if answers.get("smoking") == "yes":
+        plan.append("Stop smoking. Seek support.")
+    if answers.get("alcohol") == "yes":
+        plan.append("Limit or stop alcohol.")
+    plan.append("Practice 20 min mindful breathing daily for stress.")
+    plan.append("Monitor BP twice weekly and log readings.")
+    return plan
+
+
+def user_profile_page():
+    st.header("Your Profile — Summary (short & precise)")
+    user = load_user(st.session_state.get("email"))
+    if not user:
+        st.info("No profile found. Please login / register.")
+        return
+    st.subheader(f"{user.get('name')} — {user.get('email')}")
+    st.write(f"Age: {user.get('age')}  •  Gender: {user.get('gender')}")
+    st.write(f"Weight: {user.get('weight')} kg  •  Height: {user.get('height')} cm  •  BMI: {user.get('bmi')}")
+    data = user.get("data", {})
+    answers = data.get("answers", {})
+    st.write("Recent answers (short):")
+    for k, v in answers.items():
+        st.write(f"- {k}: {v}")
+    presc = data.get("last_prescription")
+    if presc:
+        st.write("Last prescription summary:")
+        st.write(presc["text"][:500])
+    else:
+        st.write("No prescription saved yet.")
+
+    st.markdown("### Diet & Lifestyle (short)")
+    plan = generate_short_plan(user, answers)
+    for item in plan:
+        st.write(f"- {item}")
+
+
+def reminders_page():
+    st.header("Daily Reminders & Medication Schedule")
+    st.write("This demo shows in-app reminders. Use the 'Send now' button to show the notification immediately in-app.")
+
+    reminders = st.session_state.get(
+        REMINDERS_KEY,
+        [
+            {"time": "09:00", "message": "Take BP tablet (if prescribed)"},
+            {"time": "20:00", "message": "Evening: 20 min yoga (standing forward fold, cat-cow, child's pose)"},
+        ],
+    )
+    for r in reminders:
+        st.write(f"- {r['time']} — {r['message']}")
+
+    with st.form("add_reminder_form"):
+        t = st.time_input("Reminder time", value=datetime.now().replace(hour=9, minute=0).time(), key="reminder_time")
+        msg = st.text_input("Message", value="Take medication on time", key="reminder_message")
+        added = st.form_submit_button("Add reminder", key="add_reminder_btn")
+    if added:
+        reminders.append({"time": t.strftime("%H:%M"), "message": msg})
+        st.session_state[REMINDERS_KEY] = reminders
+        st.success("Reminder added (in-app)")
+        send_in_app_notification("Reminder added", f"{t.strftime('%H:%M')} — {msg}")
+
+    # 'Send now' demo button to trigger in-app notification immediately
+    if st.button("Send reminders now (demo)"):
+        for r in reminders:
+            send_in_app_notification("Reminder", f"{r['time']} — {r['message']}")
+
+
+# -------------------------
+# Main
+# -------------------------
+def main():
+    # initialize notifications storage
+    init_notifications()
+
+    # show notifications in the sidebar
+    st.sidebar.header("Notifications (recent)")
+    if st.session_state["notifications"]:
+        for n in reversed(st.session_state["notifications"][-8:]):
+            st.sidebar.write(f"- {n['time'].split('T')[-1][:8]} — **{n['title']}**: {n['message']}")
+    else:
+        st.sidebar.write("No notifications yet.")
+
+    st.title("Hypertension Detection — Demo App")
+
+    # initialize page & load last-login into session_state defaults if empty
+    if "page" not in st.session_state:
+        st.session_state["page"] = "Home"
+
+    last = load_last_login()
+    if "email" not in st.session_state and last.get("email"):
+        st.session_state["email"] = last.get("email", "")
+        st.session_state["name"] = last.get("name", "")
+        st.session_state["phone"] = last.get("phone", "")
+
+    # show success message after profile save if present
+    if st.session_state.get("profile_saved"):
+        st.success("Profile updated successfully.")
+        st.session_state.pop("profile_saved", None)
+
+    # sidebar navigation (keeps in sync with session_state.page)
+    menu = ["Home", "Intro", "Risk", "Profile", "Reminders"]
+    current_index = menu.index(st.session_state["page"]) if st.session_state["page"] in menu else 0
+    choice = st.sidebar.radio("Navigate", menu, index=current_index, key="side_nav")
+    if choice != st.session_state["page"]:
+        st.session_state["page"] = choice
+        # smooth rerun when navigation changes
+        safe_rerun()
+
+    # ensure minimal session keys
+    if "email" not in st.session_state:
+        st.session_state["email"] = ""
+    if "name" not in st.session_state:
+        st.session_state["name"] = ""
+
+    # route pages
+    if st.session_state["page"] == "Home":
+        login_page()
+    elif st.session_state["page"] == "Intro":
+        if not st.session_state.get("email"):
+            st.info("Please login on the Home page first.")
+        else:
+            intro_and_health_input()
+    elif st.session_state["page"] == "Risk":
+        if not st.session_state.get("email"):
+            st.info("Please login on the Home page first.")
+        else:
+            risk_and_prescription()
+    elif st.session_state["page"] == "Profile":
+        if not st.session_state.get("email"):
+            st.info("Please login on the Home page first.")
+        else:
+            user_profile_page()
+    elif st.session_state["page"] == "Reminders":
+        if not st.session_state.get("email"):
+            st.info("Please login on the Home page first.")
+        else:
+            reminders_page()
+
+
+if __name__ == "__main__":
+    main()
